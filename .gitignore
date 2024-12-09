@@ -2,3 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+/data/*
+*.Rmd
+etl-venv/*
+*.pyc
+*.db
+.DS_Store
+.env
