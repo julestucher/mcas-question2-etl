@@ -2,7 +2,7 @@ from airflow import DAG
 from airflow.decorators import dag, task
 from datetime import datetime
 from airflow.operators.python import PythonOperator
-from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from datetime import datetime
 import pandas as pd
 from selenium import webdriver
@@ -12,20 +12,21 @@ from time import sleep
 import json
 
 # iterate over election items to obtain text
-def scrape_precinct_data(town, precinct_element):
+def scrape_town_data(town):
+
+    # get town name
+    town_name = town.find_element(By.CSS_SELECTOR, ".label").text
 
     # get response objects
-    cols = precinct_element.find_elements(By.TAG_NAME, "td")
+    cols = town.find_elements(By.TAG_NAME, "td")
 
     # get data from the row
     data = {
-        "town": town,
-        "ward": cols[1].text,
-        "precinct": cols[2].text,
-        "response_yes": cols[3].text,
-        "response_no": cols[4].text,
-        "response_blank": cols[5].text,
-        "response_total": cols[6].text,
+        "town": town_name,
+        "response_yes": cols[1].text,
+        "response_no": cols[2].text,
+        "response_blank": cols[3].text,
+        "response_total": cols[4].text,
     }
 
     # return data
@@ -43,12 +44,13 @@ def scrape_county_data(**kwargs):
     driver = webdriver.Firefox(options=firefox_options)
 
     # visit site for Question 2
-    driver.get("https://electionstats.state.ma.us/ballot_questions/view/7391/filter_by_county:" + county)
+    driver.get("https://electionstats.state.ma.us/ballot_questions/view/11621/filter_by_county:" + county)
 
     # sleep for 2 ms
     sleep(2)
 
     # expand all More buttons to view each district
+    '''
     more_buttons = driver.find_elements(By.CSS_SELECTOR, ".expand_toggle")
     for button in more_buttons:
         driver.execute_script("arguments[0].scrollIntoView({behavior: 'auto', block: 'center', inline: 'center'});", button)
@@ -60,6 +62,7 @@ def scrape_county_data(**kwargs):
                 button.click()
             finally:
                 break
+    '''
 
     # get list of locality names and ids
     towns = driver.find_elements(By.CSS_SELECTOR, ".m_item")
@@ -69,11 +72,8 @@ def scrape_county_data(**kwargs):
 
     # iterate over each town
     for town in towns:
-        town_name = town.find_element(By.CSS_SELECTOR, ".label").text
-        id = town.get_attribute('id').split("-")[-1]
-        precincts = driver.find_elements(By.CSS_SELECTOR, ".precinct.precinct-for-" + id)
-        precinct_results = [scrape_precinct_data(town_name, precinct_element) for precinct_element in precincts]
-        county_results = county_results + precinct_results
+        town_results = scrape_town_data(town)
+        county_results.append(town_results)
 
     # close session and shut down browser
     driver.quit()
@@ -95,6 +95,11 @@ def transform_county_data(**kwargs):
 
     # convert town to title case
     election_df['town'] = election_df['town'].str.title()
+
+    # clean strings with directional names (N/S/E/W)
+    directions = {'N.':'North', 'S.':'South', 'E.':'East', 'W.':'West'}
+    for key, val in directions:
+        election_df['town'] = election_df['town'].apply(lambda col: col.str.replace(key, val))
     
     # clean numeric strings
     numeric_cols = ['response_yes', 'response_no', 'response_blank', 'response_total']
@@ -105,15 +110,16 @@ def transform_county_data(**kwargs):
     election_df.to_csv(f'/tmp/{county}_transformed.csv', index=False)
 
 
-
 # create a function that will create operators for a specific county
 def create_dag(dag_id, county):
     
-    dag = DAG(dag_id, default_args=default_args, schedule_interval='@daily')
+    dag = DAG(dag_id,
+              default_args=default_args,
+              schedule=None,
+              catchup=False)
 
     extract_task = PythonOperator(
         task_id=f'scrape_{county}_data',
-        provide_context=True,
         python_callable=scrape_county_data,
         op_kwargs={'county': county},
         dag=dag,
@@ -121,17 +127,17 @@ def create_dag(dag_id, county):
 
     transform_task = PythonOperator(
         task_id=f'transform_{county}_data',
-        provide_context=True,
         python_callable=transform_county_data,
         op_kwargs={'county': county},
         dag=dag,
     )
 
-    load_task = PostgresOperator(
+    load_task = SQLExecuteQueryOperator(
         task_id=f'load_{county}_data',
-        postgres_conn_id='mcas_db',
+        conn_id='mcas_db',
         sql=f"""
-            COPY election_result (county, town, ward, precinct, response_yes, response_no, response_blank, response_total)
+            DELETE FROM election_result WHERE county = '{county}';
+            COPY election_result (county, town, response_yes, response_no, response_blank, response_total)
             FROM '/tmp/{county}_transformed.csv'
             DELIMITER ','
             CSV HEADER;
@@ -148,7 +154,8 @@ ma_counties = ['Barnstable', 'Berkshire', 'Bristol', 'Dukes', 'Essex', 'Franklin
 
 default_args = {
     'owner': 'jtucher',
-    'start_date': datetime(2024, 1, 1),
+    'depends_on_past': False,
+    #'start_date': datetime(2024, 1, 1),
     'retries': 1,
 }
 
@@ -156,7 +163,5 @@ default_args = {
 for county in ma_counties:
     dag_id = f"election_results_{county}"
     globals()[dag_id] = create_dag(dag_id, county)
-
-
 
 

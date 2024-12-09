@@ -6,12 +6,20 @@ class ElectionResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     county = db.Column(db.String(100), nullable=False)
     town = db.Column(db.String(100), nullable=False)
-    ward = db.Column(db.String(100), nullable=False)
-    precinct = db.Column(db.String(100), nullable=False)
     response_yes = db.Column(db.Integer, nullable=False)
     response_no = db.Column(db.Integer, nullable=False)
     response_blank = db.Column(db.Integer, nullable=False)
     response_total = db.Column(db.Integer, nullable=False)
+
+CREATE TABLE election_result (
+    id SERIAL PRIMARY KEY,
+    county VARCHAR(100),
+    town VARCHAR(100),
+    response_yes NUMERIC,
+    response_no NUMERIC,
+    response_blank NUMERIC,
+    response_total NUMERIC
+);
 
 # Define a database model for district-level analysis
 class SchoolDistrict(db.Model):

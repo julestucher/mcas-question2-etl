@@ -1,6 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from datetime import datetime
 import requests
 import geopandas as gpd
@@ -38,6 +38,9 @@ def transform_district_geo_data():
     sd_town_cols['MEMBERLIST'] = sd_town_cols['MEMBERLIST'].str.split(', ')
     cw_df = sd_town_cols.explode('MEMBERLIST')
     cw_df.columns = ['district_code', 'district_name', 'town']
+
+    # set town to district name if missing
+    cw_df.loc[cw_df['town'].isna(), 'town'] = cw_df.loc[cw_df['town'].isna(), 'district_name']
     
     # write transformed data
     cw_df.to_csv(f'/tmp/district_town_crosswalk.csv', index=False)
@@ -68,36 +71,39 @@ default_args = {
 }
 
 # Create DAG
-with DAG('district_gis_etl', default_args=default_args, schedule_interval='@daily') as dag:
+dag = DAG('district_gis_etl', default_args=default_args, schedule='@daily')
 
-    extract_task = PythonOperator(
-        task_id='fetch_district_geo_data',
-        python_callable=fetch_district_geo_data,
-        dag=dag,
-    )
+extract_task = PythonOperator(
+    task_id='fetch_district_geo_data',
+    python_callable=fetch_district_geo_data,
+    dag=dag,
+)
 
-    transform_task = PythonOperator(
-        task_id='transform_district_geo_data',
-        python_callable=transform_district_geo_data,
-        dag=dag,
-    )
+transform_task = PythonOperator(
+    task_id='transform_district_geo_data',
+    python_callable=transform_district_geo_data,
+    dag=dag,
+)
 
-    load_cw_task = PostgresOperator(
-        task_id='load_district_cw_data',
-        postgres_conn_id='mcas_db',
-        sql="""
-        COPY district_town_lookup (district_code, district_name, town)
-        FROM '/tmp/district_town_crosswalk.csv'
-        DELIMITER ','
-        CSV HEADER;
-        """,
-        dag=dag,
-    )
+load_cw_task = SQLExecuteQueryOperator(
+    task_id='load_district_cw_data',
+    conn_id='mcas_db',
+    sql="""
+    DELETE FROM district_town_lookup;
+    COPY district_town_lookup (district_code, district_name, town)
+    FROM '/tmp/district_town_crosswalk.csv'
+    DELIMITER ','
+    CSV HEADER;
+    """,
+    dag=dag,
+)
 
-    load_gis_task = PythonOperator(
-        task_id='load_district_shapes_to_postgis',
-        python_callable=load_district_shapes_to_postgis,
-    )
+load_gis_task = PythonOperator(
+    task_id='load_district_shapes_to_postgis',
+    python_callable=load_district_shapes_to_postgis,
+)
 
-    extract_task >> transform_task >> load_cw_task >> load_gis_task
+extract_task >> transform_task >> load_cw_task >> load_gis_task
+
+dag.test()
 
