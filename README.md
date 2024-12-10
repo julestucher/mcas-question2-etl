@@ -1,6 +1,11 @@
 # ETL Pipeline for MCAS Achievement, Graduation Rates, and 2024 Question 2 Polling in Massachusetts
 
+# Build docker image
+docker build -t custom-airflow:latest .
+
 ## Database models -- create single, one-time script that creates the databases
+
+
 # Define a database model for district-level analysis
 class ElectionResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -47,3 +52,9 @@ CREATE TABLE district_shapes (
     district_name VARCHAR(100),
     geometry GEOMETRY(MULTIPOLYGON, 4326)
 );
+
+# Airflow connection to local Postgresql
+Once Airflow is up and running in Docker environment, add connection on Webserver.
+
+
+

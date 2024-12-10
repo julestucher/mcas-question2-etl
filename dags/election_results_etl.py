@@ -1,15 +1,13 @@
 from airflow import DAG
-from airflow.decorators import dag, task
-from datetime import datetime
 from airflow.operators.python import PythonOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-from datetime import datetime
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 from time import sleep 
 import json
+from datetime import datetime
 
 # iterate over election items to obtain text
 def scrape_town_data(town):
@@ -115,7 +113,7 @@ def create_dag(dag_id, county):
     
     dag = DAG(dag_id,
               default_args=default_args,
-              schedule=None,
+              schedule='@daily',
               catchup=False)
 
     extract_task = PythonOperator(
@@ -155,7 +153,7 @@ ma_counties = ['Barnstable', 'Berkshire', 'Bristol', 'Dukes', 'Essex', 'Franklin
 default_args = {
     'owner': 'jtucher',
     'depends_on_past': False,
-    #'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2024, 12, 9),
     'retries': 1,
 }
 

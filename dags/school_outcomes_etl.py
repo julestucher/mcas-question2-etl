@@ -120,7 +120,7 @@ def transform_school_data():
 
 default_args = {
     'owner': 'jtucher',
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2024, 12, 9),
     'retries': 1,
 }
 

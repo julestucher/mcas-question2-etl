@@ -3,9 +3,9 @@
 .RData
 .Ruserdata
 /data/*
+/logs/*
 *.Rmd
 etl-venv/*
 *.pyc
 *.db
 .DS_Store
-.env
