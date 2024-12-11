@@ -1,5 +1,7 @@
 # ETL Pipeline for 2024 Question 2 Polling and School Outcomes in Massachusetts
 
+![Screengrab of map dashboard output](./img/map.jpg)
+
 ## Data Extraction Overview
 In the 2024 election, Massachusetts Question 2 would repeal the state-wide MCAS high school graduation requirement and allow for districts to set graduation requirements for students. In my data engineering final project, I will pull together voting outcome data along with school district-level MCAS achievement data and graduation rates to create a data set for analysis. I will use Python to scrape the data from public MA Department of Elementary and Secondary Education (DESE) reports as well as from the Secretary of the Commonwealth of MA election statistics website. Finally, I will extract GIS data available from the Mass.gov website to link the town-level election restults with school district outcomes. This GIS data will also provide Shapefile geometries to create an interactive map output.
 
@@ -18,13 +20,16 @@ In the 2024 election, Massachusetts Question 2 would repeal the state-wide MCAS 
     - Pull out district code and Polygon object. Filter out any invalid geometries.
 
 ## Requirements / Tools Used
+
+This project was build on a MacOS environment running Sequoia 15.1.1.
+
  - Python 3.8
  - Docker 27.3.1
  - Docker Compose v2.30.3
  - Apache Airflow
  - PostgreSQL
- - R
  - Firefox
+ - R
 
 ## Setup
 
@@ -37,13 +42,14 @@ DB_URI = [YOUR DB URI]
 
 3. Create and activate Python virtual environment using `requirements.txt`.
 
-4. Build custom Docker image:
+4. Confirm Docker Desktop is running.
 
+5. Build custom Docker image:
 ```
 docker build -t custom-airflow:latest .
 ```
 
-5. Initialize Airflow using Docker.
+6. Initialize Airflow using Docker.
 ```
 docker compose up airflow-init
 ```
@@ -69,15 +75,23 @@ docker compose run airflow-worker airflow connections add 'mcas_db' \
 
 5. Run school outcomes ETL locally.
 
+```
+python3 school_outcomes_etl.py
+```
+
 6. Run election results ETL locally.
+
+```
+python3 election_results_etl.py
+```
 
 ## Running the Dashboard
 
 1. Open `mcas-question2-etl.Rproj` in RStudio.
 
-2.  Run dashboard from CLI.
+2.  Run dashboard from the R console.
 ```
-R -e "shiny::runApp('./app.R')"
+shiny::runApp('./app.R')
 ```
 
 ## Database Schema
@@ -124,7 +138,7 @@ CREATE TABLE district_shapes (
 
 ## Next Steps for this Project
 
-Ideally, all three ETLs would be orchestrated using Airflow. Due to constraints around using a web driver within a Dockerized Airflow environment, including the web scraping tasks was not in the scope of this project. Once the school outcomes and election results pipelines are integrated into the Docker environment, the whole project will exist in a single container and could be shipped and hosted in the cloud.
+Ideally, all three ETLs would be orchestrated using Airflow. Due to constraints around using a web driver within a Dockerized Airflow environment, including the web scraping tasks was not in the scope of this project. Once the school outcomes and election results pipelines are integrated into the Docker environment, the whole project will exist in a single container and could be shipped and hosted in the cloud. Furthermore, it would be interesting to create a statistical model to explore the relationship between school district outcomes and Question 2 election results.
 
 
 

@@ -5,6 +5,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service
 from time import sleep 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -68,7 +69,9 @@ def scrape_district_data():
     # Initialize the WebDriver
     firefox_options = Options()
     firefox_options.add_argument("--headless")
-    driver = webdriver.Firefox(options=firefox_options)
+    firefox_service = Service(executable_path="./geckodriver")
+    driver = webdriver.Firefox(options=firefox_options,
+                               service = firefox_service)
 
     # load MCAS webpage
     driver.get("https://profiles.doe.mass.edu/statereport/mcas.aspx")
@@ -104,7 +107,7 @@ def transform_district_data(mcas_df, grad_df):
 
     # convert datatypes
     numeric_cols = ['num_meets_exceeds', 'num_partial_meet', 'num_not_meet']
-    mcas_df[numeric_cols] = mcas_df[numeric_cols].apply(lambda col: col.str.replace(',', '').astype(int))
+    mcas_df.loc[:, numeric_cols] = mcas_df.loc[:, numeric_cols].apply(lambda col: col.str.replace(',', '').astype(int))
 
     # reshape wide to the school-district level
     mcas_df = mcas_df.pivot(index = 'district_code',
@@ -118,16 +121,17 @@ def transform_district_data(mcas_df, grad_df):
     # subset and rename cols of grad data
     grad_df = grad_df[['District Name', 'District Code', 'Year', '% Graduated']]
     grad_df.columns = ['district_name', 'district_code', 'year', 'percent_grad']
-    grad_df['percent_grad'] = grad_df['percent_grad'].astype(float)
+    grad_df.loc[:, 'percent_grad'] = grad_df.loc[:, 'percent_grad'].astype(float)
 
     # merge to create school-based data
     school_df = pd.merge(mcas_df, grad_df, on = 'district_code', validate = '1:1')
 
     # filter out state-wide results
-    school_df = school_df[school_df['district_code'] != 0]
+    school_df = school_df[school_df['district_name'] != 'State Total']
     numeric_cols = ['district_code', 'year', 'num_meets_exceeds_ELA', 'num_partial_meet_ELA', 'num_not_meet_ELA']
     school_df[numeric_cols] = school_df[numeric_cols].apply(lambda col: col.astype(int))
     school_df = school_df[['district_code', 'district_name', 'year', 'num_meets_exceeds_ELA', 'num_partial_meet_ELA', 'num_not_meet_ELA', 'percent_grad']]
+    school_df.columns = ['district_code', 'district_name', 'year', 'num_meets_exceeds_ela', 'num_partial_meet_ela', 'num_not_meet_ela', 'percent_grad']
 
     # write transformed data
     return school_df

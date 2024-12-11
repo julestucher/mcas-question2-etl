@@ -29,7 +29,7 @@ assert_that(length(unique(school_town_df$district_code)) == nrow(school_town_df)
 
 # create shapefile for plotting
 shapefile <- district_shapes %>%
-  mutate(district_code = as.numeric(district_code)) %>%
+  mutate(district_code = as.integer(district_code)) %>%
   left_join(school_town_df,
             by = c("district_code", "district_name")) %>%
   arrange(!is.na(prop_yes), prop_yes)

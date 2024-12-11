@@ -1,4 +1,4 @@
-list.of.packages <- c("DBI", "RPostgres", "tidyverse", "sf", "assertthat", "rstudioapi", "leaflet")
+list.of.packages <- c("DBI", "RPostgres", "tidyverse", "sf", "assertthat", "leaflet")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 library(DBI)
@@ -6,12 +6,9 @@ library(RPostgres)
 library(tidyverse)
 library(sf)
 library(assertthat)
-library(rstudioapi) 
 library(leaflet)
 
-# retrieving path from getSourceEditorContext() 
-local <- dirname(getSourceEditorContext()$path)
-source(file.path(local, "app_data.R"))
+source("./app_data.R")
 
 server <- function(input, output){
   

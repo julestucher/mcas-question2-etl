@@ -50,7 +50,9 @@ def scrape_county_data(county):
     # Initialize the WebDriver
     firefox_options = Options()
     firefox_options.add_argument("--headless")
-    driver = webdriver.Firefox(options=firefox_options)
+    firefox_service = Service(executable_path="./geckodriver")
+    driver = webdriver.Firefox(options=firefox_options,
+                               service = firefox_service)
 
     # visit site for Question 2
     driver.get("https://electionstats.state.ma.us/ballot_questions/view/11621/filter_by_county:" + county)
