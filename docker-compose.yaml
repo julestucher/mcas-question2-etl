@@ -61,6 +61,7 @@
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__TEST_CONNECTION: Enabled
       AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
       # yamllint disable rule:line-length
       # Use simple http server on scheduler for health checks
@@ -117,13 +118,10 @@
         retries: 50
         start_period: 30s
       restart: always
-  
+
     airflow-webserver:
       <<: *airflow-common
       command: webserver
-      environment:
-        - AIRFLOW__CORE__TEST_CONNECTION=Enabled
-        - AIRFLOW_CONN_MCAS_DB=postgresql://localhost:5432/juliatucher
       ports:
         - "8080:8080"
       healthcheck:
@@ -292,4 +290,5 @@
   
   volumes:
     postgres-db-volume:
+  
   
