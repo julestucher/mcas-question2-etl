@@ -30,42 +30,46 @@ In the 2024 election, Massachusetts Question 2 would repeal the state-wide MCAS 
 
 1. Configure PostgreSQL database according to the below section Database Schema.
 
-2. Update `/dags/district_gis_etl.py` file on line 12 to include your database URI:
+2. Update `/dags/district_gis_etl.py` file on line 12, `election_results_etl.py` file on line 11, and `school_outcomes_elt.py` file on line 13 to include your database URI:
 ```
 DB_URI = [YOUR DB URI]
 ```
 
-2. Build custom Docker image:
+3. Create and activate Python virtual environment using `requirements.txt`.
+
+4. Build custom Docker image:
 
 ```
 docker build -t custom-airflow:latest .
 ```
 
-3. Initialize Airflow using Docker.
+5. Initialize Airflow using Docker.
 ```
 docker compose up airflow-init
 ```
 
-4. Run Airflow using Docker.
+## Running the Pipeline
+
+1. Run Airflow using Docker.
 ```
 docker compose up
 ```
 
-5. Add custom connection, either via Webserver UI or via CLI. Populate using your PostgreSQL details. If hosting PostgreSQL database locally, ensure that database is [open to connections from Docker container](https://stackoverflow.com/questions/31249112/allow-docker-container-to-connect-to-a-local-host-postgres-database).
+2. Add custom connection, either via Webserver UI or via CLI. Populate using your PostgreSQL details. If hosting PostgreSQL database locally, ensure that database is [open to connections from Docker container](https://stackoverflow.com/questions/31249112/allow-docker-container-to-connect-to-a-local-host-postgres-database).
 ```
 docker compose run airflow-worker airflow connections add 'mcas_db' \
     --conn-uri [YOUR URI]
 ```
 
-## Running the Pipeline
+3. Access Airflow webserver running on port 8080. The username and password are `airflow`.
 
-1. Access Airflow webserver running on port 8080. The username and password are `airflow`.
+3. Trigger district GIS DAG.
 
-2. Trigger district GIS DAG.
+4. Once confirming clean DAG run, data will be loaded into your PostgreSQL database and the analysis dashboard can be run.
 
-3. Once confirming clean DAG run, data will be loaded into your PostgreSQL database and the analysis dashboard can be run.
+5. Run school outcomes ETL locally.
 
-4. Run webscraping ETLs locally.
+6. Run election results ETL locally.
 
 ## Running the Dashboard
 
@@ -117,6 +121,10 @@ CREATE TABLE district_shapes (
     geometry GEOMETRY(MULTIPOLYGON, 4326)
 );
 ```
+
+## Next Steps for this Project
+
+Ideally, all three ETLs would be orchestrated using Airflow. Due to constraints around using a web driver within a Dockerized Airflow environment, including the web scraping tasks was not in the scope of this project. Once the school outcomes and election results pipelines are integrated into the Docker environment, the whole project will exist in a single container and could be shipped and hosted in the cloud.
 
 
 

@@ -9,3 +9,4 @@ etl-venv/*
 *.pyc
 *.db
 .DS_Store
+uri.txt
