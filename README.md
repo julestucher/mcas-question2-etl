@@ -63,6 +63,52 @@ CREATE TABLE district_shapes (
 ```
 
 ## Automation
+One of the three ETL pipelines is automated by a locally-hosted, Dockerized Airflow workflow. When running, this pipeline runs on a daily schedule to pull the MassGIS data. The other two pipelines, those that include a web scraping component, can be run manually from the command line.
+
+## Database Schema
+The data will be loaded into a PostgreSQL database hosted locally. SQL code to create each of the four tables is shown below. 
+```
+# Define a database model for election results
+CREATE TABLE election_result (
+    id SERIAL PRIMARY KEY,
+    county VARCHAR(100),
+    town VARCHAR(100),
+    response_yes NUMERIC,
+    response_no NUMERIC,
+    response_blank NUMERIC,
+    response_total NUMERIC
+);
+
+# Define a database model for school district outcomes
+CREATE TABLE school_district (
+    id SERIAL PRIMARY KEY,
+    district_code NUMERIC,
+    district_name VARCHAR(100),
+    year NUMERIC,
+    num_meets_exceeds_ela NUMERIC,
+    num_partial_meet_ela NUMERIC,
+    num_not_meet_ela NUMERIC,
+    percent_grad NUMERIC
+);
+
+# Define a database model for district-town linking
+CREATE TABLE district_town_lookup (
+    id SERIAL PRIMARY KEY,
+    district_code NUMERIC,
+    district_name VARCHAR(100),
+    town VARCHAR(100)
+);
+
+# Define a database model for GIS data
+CREATE TABLE district_shapes (
+    id SERIAL PRIMARY KEY,
+    district_code NUMERIC,
+    district_name VARCHAR(100),
+    geometry GEOMETRY(MULTIPOLYGON, 4326)
+);
+```
+
+## Automation
 One of the three ETL pipelines is automated by a locally-hosted, Dockerized Airflow workflow. When running, this pipeline runs on a daily schedule to pull the MassGIS data. The other two pipelines, those that include a web scraping component, can be run manually from the command line. 
 
 ## Requirements / Tools Used

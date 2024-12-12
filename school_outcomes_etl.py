@@ -150,6 +150,9 @@ def load_district_data(school_df):
 
 if __name__ == "__main__":
 
+    if DB_URI == '':
+        raise Exception("Please define database URI.")
+
     # Extract
     try:
         mcas_df, grad_df = scrape_district_data()
@@ -167,3 +170,5 @@ if __name__ == "__main__":
         load_district_data(school_df)
     except:
         print("Load task failed for school district data")
+
+        

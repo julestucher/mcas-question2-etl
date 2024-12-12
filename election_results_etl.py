@@ -130,6 +130,9 @@ def load_county_data(election_df, county):
 
 if __name__ == "__main__":
 
+    if DB_URI == '':
+        raise Exception("Please define database URI.")
+    
     # Declare list of counties in Massachusetts
     ma_counties = ['Barnstable', 'Berkshire', 'Bristol', 'Dukes', 'Essex', 'Franklin', 'Hampden', 'Hampshire', 'Middlesex', 'Nantucket', 'Norfolk', 'Plymouth', 'Suffolk', 'Worcester']
 
