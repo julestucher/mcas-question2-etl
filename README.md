@@ -20,7 +20,7 @@ In the 2024 election, Massachusetts Question 2 would repeal the state-wide MCAS 
     - Pull out district code and Polygon object. Filter out any invalid geometries.
  
 ## Database Schema
-The data will be loaded into a PostgreSQL database hosted locally. SQL code to create each the four tables is shown below. 
+The data will be loaded into a PostgreSQL database hosted locally. SQL code to create each of the four tables is shown below. 
 ```
 # Define a database model for election results
 CREATE TABLE election_result (
