@@ -18,9 +18,54 @@ In the 2024 election, Massachusetts Question 2 would repeal the state-wide MCAS 
     - Relevant data from Shapefile includes includes district codes, list of member towns for each district, and district Polygon.
     - Pull out district code and list of member towns. Reshape longer to create district-town lookup.
     - Pull out district code and Polygon object. Filter out any invalid geometries.
+ 
+## Database Schema
+The data will be loaded into a PostgreSQL database hosted locally. SQL code to create each the four tables is shown below. 
+```
+# Define a database model for election results
+CREATE TABLE election_result (
+    id SERIAL PRIMARY KEY,
+    county VARCHAR(100),
+    town VARCHAR(100),
+    response_yes NUMERIC,
+    response_no NUMERIC,
+    response_blank NUMERIC,
+    response_total NUMERIC
+);
+
+# Define a database model for school district outcomes
+CREATE TABLE school_district (
+    id SERIAL PRIMARY KEY,
+    district_code NUMERIC,
+    district_name VARCHAR(100),
+    year NUMERIC,
+    num_meets_exceeds_ela NUMERIC,
+    num_partial_meet_ela NUMERIC,
+    num_not_meet_ela NUMERIC,
+    percent_grad NUMERIC
+);
+
+# Define a database model for district-town linking
+CREATE TABLE district_town_lookup (
+    id SERIAL PRIMARY KEY,
+    district_code NUMERIC,
+    district_name VARCHAR(100),
+    town VARCHAR(100)
+);
+
+# Define a database model for GIS data
+CREATE TABLE district_shapes (
+    id SERIAL PRIMARY KEY,
+    district_code NUMERIC,
+    district_name VARCHAR(100),
+    geometry GEOMETRY(MULTIPOLYGON, 4326)
+);
+```
+
+## Automation
+One of the three ETL pipelines is automated by a locally-hosted, Dockerized Airflow workflow. When running, this pipeline runs on a daily schedule to pull the MassGIS data. The other two pipelines, those that include a web scraping component, can be run manually from the command line. 
 
 ## Requirements / Tools Used
-
 This project was build on a MacOS environment running Sequoia 15.1.1.
 
  - Python 3.8
@@ -33,7 +78,7 @@ This project was build on a MacOS environment running Sequoia 15.1.1.
 
 ## Setup
 
-1. Configure PostgreSQL database according to the below section Database Schema.
+1. Configure PostgreSQL database according to the above section Database Schema.
 
 2. Update `/dags/district_gis_etl.py` file on line 12, `election_results_etl.py` file on line 11, and `school_outcomes_elt.py` file on line 13 to include your database URI:
 ```
@@ -92,48 +137,6 @@ python3 election_results_etl.py
 2.  Run dashboard from the R console.
 ```
 shiny::runApp('./app.R')
-```
-
-## Database Schema
-```
-# Define a database model for election results
-CREATE TABLE election_result (
-    id SERIAL PRIMARY KEY,
-    county VARCHAR(100),
-    town VARCHAR(100),
-    response_yes NUMERIC,
-    response_no NUMERIC,
-    response_blank NUMERIC,
-    response_total NUMERIC
-);
-
-# Define a database model for school district outcomes
-CREATE TABLE school_district (
-    id SERIAL PRIMARY KEY,
-    district_code NUMERIC,
-    district_name VARCHAR(100),
-    year NUMERIC,
-    num_meets_exceeds_ela NUMERIC,
-    num_partial_meet_ela NUMERIC,
-    num_not_meet_ela NUMERIC,
-    percent_grad NUMERIC
-);
-
-# Define a database model for district-town linking
-CREATE TABLE district_town_lookup (
-    id SERIAL PRIMARY KEY,
-    district_code NUMERIC,
-    district_name VARCHAR(100),
-    town VARCHAR(100)
-);
-
-# Define a database model for GIS data
-CREATE TABLE district_shapes (
-    id SERIAL PRIMARY KEY,
-    district_code NUMERIC,
-    district_name VARCHAR(100),
-    geometry GEOMETRY(MULTIPOLYGON, 4326)
-);
 ```
 
 ## Next Steps for this Project
