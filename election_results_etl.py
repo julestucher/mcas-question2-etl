@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 # define global for database URI
-DB_URI = 'postgresql://juliatucher:dataeng690@localhost:5432/juliatucher'
+DB_URI = ''
 
 def scrape_town_data(town):
     """

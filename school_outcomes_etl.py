@@ -11,7 +11,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 # define global for database URI
-DB_URI = 'postgresql://juliatucher:dataeng690@localhost:5432/juliatucher'
+DB_URI = ''
 
 def scrape_school_outcome(year, table_name, driver):
     """

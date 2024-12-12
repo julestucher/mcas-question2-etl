@@ -9,7 +9,7 @@ import os
 from sqlalchemy import create_engine
 
 # define global for database URI
-DB_URI = 'postgresql://juliatucher:dataeng690@host.docker.internal:5432/juliatucher'
+DB_URI = ''
 
 def fetch_district_geo_data():
     """
