@@ -1,0 +1,238 @@
+---
+title: "GIS Analysis"
+author: "Jules Tucher"
+date: "`r Sys.Date()`"
+output: html_document
+---
+<style>
+
+th {
+    font-size: 32px;
+}
+
+td {
+    font-size: 24px;
+}
+</style>
+
+```{r setup, include=FALSE}
+library(tidyverse)
+knitr::opts_chunk$set(echo = TRUE)
+
+root <- file.path(dirname(getwd()))
+datadir <- file.path(root, "Data")
+
+# load analysis file
+town_analysis_dataset <- read_csv(file.path(datadir, "town_analysis_dataset.csv")) 
+```
+
+```{r n-charters}
+# last minute add of number of charters per town
+charters <- read_csv(file.path(datadir, "schooldistricts_Charters.csv")) 
+
+# reshape schools to town level
+town_charters <- charters %>%
+  
+  # select relevant lookup fields
+  select(ORG8CODE, NAME, MEMBERS) %>%
+  
+  # split members into columns
+  separate(col = "MEMBERS", into = paste0("town_", rep(1:28)), sep = ", ", remove=T, fill="right") %>%
+  
+  # reshape to district-town level and filter NAs
+  pivot_longer(cols=town_1:town_28, names_to = "town_number", values_to = "town_name") %>%
+  filter(!is.na(town_name)) %>%
+  
+  # pivot to town level
+  group_by(town_name) %>%
+  summarize(num_charters=n())
+
+```
+
+```{r create-constructs}
+
+# create additional constructs for analysis
+analysis_data <- town_analysis_dataset %>%
+  left_join(
+    town_charters,
+    by=c("TOWN20" = "town_name"),
+    relationship="one-to-one"
+  ) %>%
+  mutate(pct_ela_mcas_prof = num_meets_exceeds_ela / (num_meets_exceeds_ela + num_partial_meet_ela + num_not_meet_ela),
+         pct_pov = pov_rate,
+         q2_yes_prop = response_yes / (response_yes + response_no),
+         num_charters_per_cap = ifelse(is.na(num_charters), 0, num_charters / (POP2020 / 10000))) %>%
+  select(q2_yes_prop, percent_grad, pct_ela_mcas_prof, num_charters_per_cap, pct_nh_black, pct_nh_asian, pct_hisp, pct_pov, pct_bachplus, response_total) %>%
+  mutate(
+    across(
+      starts_with("pct_"),
+      ~.x*100
+    )
+  ) %>%
+  rename("pct_grad" = "percent_grad")
+  
+
+analysis_data %>% summary()
+```
+
+
+```{r continuous-vote-share}
+ma_quasi <- glm(q2_yes_prop ~
+                  
+                   # school outcomes
+                   pct_grad +
+                   pct_ela_mcas_prof + 
+                  
+                   # school choice
+                   num_charters_per_cap + 
+                   
+                   # town controls -- race/ethnic
+                   pct_nh_black +
+                   pct_nh_asian +
+                   pct_hisp +
+                   
+                   # town controls -- SES
+                   pct_pov + 
+                   pct_bachplus,
+                 family = quasibinomial,
+                weights = response_total,
+                data = analysis_data)
+
+summary(ma_quasi)
+```
+```{r stargazer}
+library(stargazer)
+
+stargazer(list(ma_quasi, ma_quasi),
+  title="Table 1: Quasi-binomial Regression Results",
+  type="text",
+  align=TRUE,
+  dep.var.labels = c("Coef.", "SE"),
+  style = "asr",
+  coef=list(
+    ma_quasi$coefficients,
+    summary(ma_quasi)$coefficients[,"Std. Error"]
+  ),
+  p=list(
+    summary(ma_quasi)$coefficients[,"Pr(>|t|)"],
+    c()
+  ),
+  covariate.labels=c("Graduation rate", "ELA MCAS proficiency rate", "Charter schools per 1,000 people", "Population proportion non-Hispanic, Black",
+                     "Population proportion non-Hispanic, Asian", "Population proportion Hispanic", "Poverty rate", "Proportion college-educated")
+  ,out=file.path(root, "Results", "regression.html")
+  )
+```
+```{R}
+
+# Extract coefficients with CIs
+or_results <- tidy(ma_quasi, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Odds ratio already exponentiated
+    pct_change_odds = (estimate - 1) * 100,
+    ci_low_pct      = (conf.low - 1) * 100,
+    ci_high_pct     = (conf.high - 1) * 100,
+    
+    # Policy interpretation (10pp for % vars)
+    interpretation = case_when(
+      str_detect(term, "pct_") ~ paste0("10pp ↑ → ", round(pct_change_odds), "% change in odds"),
+      TRUE ~ paste0("1-unit ↑ → ", round(pct_change_odds), "% change in odds")
+    )
+  )
+or_results
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(broom)
+library(scales)
+
+# Assume your quasi-binomial model is fitted
+# m_quasi <- glm(cbind(yes_votes, no_votes) ~ pct_mcas + pct_grad + pct_charter_perk + pct_pov,
+#                family = quasibinomial, weights = total_votes, data = ma_df)
+
+
+# q2_yes_pct ~
+#                   
+#                    # school outcomes
+#                    percent_grad +
+#                    mcas_ela_prof_pct + 
+#                   
+#                    # school choice
+#                    num_charters_per_cap + 
+#                    
+#                    # town controls -- race/ethnic
+#                    pct_nh_black +
+#                    pct_nh_asian +
+#                    pct_hisp +
+#                    
+#                    # town controls -- SES
+#                    pov_rate + 
+#                    pct_bachplus
+# Extract tidy results with CIs
+coef_plot_data <- tidy(ma_quasi, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Reorder for intuitive plot order
+    term = factor(term, levels = c("pct_ela_mcas_prof", "pct_grad", "num_charters_per_cap")),
+    # Labels for interpretability
+    label = case_when(
+      term == "pct_ela_mcas_prof" ~ "ELA MCAS Proficient (%)",
+      term == "pct_grad" ~ "Graduation Rate (%)", 
+      term == "num_charters_per_cap" ~ "Charter Schools/1k Pop",
+     # term == "pct_pov" ~ "% Poverty"
+    ),
+    # Interpretation text
+    interp = case_when(
+      term == "pct_ela_mcas_prof" ~ "+10pp → +1% odds",
+      term == "pct_grad" ~ "+10pp ↑ → -1% odds",
+      term == "num_charters_per_cap" ~ "+1 unit → +4% odds", 
+      #term == "pct_pov" ~ "10pp ↑ → 12% ↑ odds"
+    )
+  ) %>%
+  filter(!is.na(term)) %>%
+  # Center OR=1 line
+  mutate(estimate = log(estimate), conf.low = log(conf.low), conf.high = log(conf.high))
+
+# Create coefficient plot
+p_coef <- ggplot(coef_plot_data, aes(x = label, y = estimate)) +
+  geom_hline(yintercept = 0, color = "grey50", linetype = "dashed", size = 0.8) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                width = 0.2, size = 1, color = "black") +
+  geom_point(size = 3, color = "steelblue", fill = "steelblue") +
+  coord_flip() +
+  scale_y_continuous(
+    "Log Odds Ratio",
+    breaks = c(-0.05, -0.02, 0, 0.02, 0.05),
+    labels = c("95%", "98%", "Ref", "102%", "105%")
+  ) +
+  labs(
+    title = "School Performance and Question 2 Support\n(Quasi-Binomial GLM)",
+    subtitle = "N=324 towns | Weights: Total Votes | 95% CIs",
+    x = ""
+  ) +
+  theme_minimal(base_size = 24) +
+ theme(
+    plot.title.position = "plot",                    # Aligns w/ full plot (not just panel)
+    text = element_text(family = "Times New Roman", 
+                       face = "plain", size = 24),
+    plot.title = element_text(family = "Arial", 
+                             face = "bold", size = 28, hjust = 0.5,
+                            margin = margin(b = 10)                        # Space below title
+                            ),
+    plot.subtitle = element_text(family = "Arial", 
+                                size = 24, hjust = 0.5,
+                                margin = margin(b = 10)                        # Space below title
+                                ),
+    axis.text = element_text(family = "Times New Roman", size = 24),
+    axis.title = element_text(family = "Times New Roman", size = 24),
+    legend.text = element_text(family = "Times New Roman"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
+
+p_coef
+
+ggsave(file.path(root, "Results", "coef_plot_poster.png"), p_coef, width = 12, height = 8, dpi = 600, bg = "white")
+```
