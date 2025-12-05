@@ -1,0 +1,106 @@
+---
+title: "Query Census Demographic Data for MA Towns"
+author: "Jules Tucher"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages(c("tidycensus"))
+library(tidycensus)
+library(tidyverse)
+
+# run once per machine, then you can omit install = TRUE
+#census_api_key("your key", install = TRUE)
+readRenviron("~/.Renviron")
+```
+
+```{r query-census}
+vars <- c(
+    # --- population denominator ---
+    total_pop        = "B01003_001",  # Total population
+
+    # --- race / ethnicity (from B03002) ---
+    tot_race         = "B03002_001",  # Total
+    nh_white         = "B03002_003",  # White alone, not Hispanic
+    nh_black         = "B03002_004",  # Black alone, not Hispanic
+    nh_asian         = "B03002_006",  # Asian alone, not Hispanic
+    hisp_any         = "B03002_012",  # Hispanic or Latino (any race)
+
+    # --- income / poverty ---
+    med_hh_inc       = "B19013_001",  # Median household income (dollars)
+    tot_pov_univ     = "B17001_001",  # Poverty universe
+    pov_below        = "B17001_002",  # Income below poverty level
+
+    # --- educational attainment 25+ (from B15002) ---
+    edu25_total      = "B15002_001",  # Total 25+
+    edu25_lt_hs      = "B15002_003",  # Male <9th
+    edu25_lt_hs2     = "B15002_004",  # Male 9–12 no diploma
+    edu25_hs_grad    = "B15002_011",  # Male HS grad
+    edu25_bach       = "B15002_015",  # Male bachelor's
+    edu25_adv        = "B15002_016",  # Male graduate or prof
+    # (you can add the analogous female codes if you want full precision)
+
+    # --- housing tenure (from B25003) ---
+    occ_hh_total     = "B25003_001",  # Occupied housing units
+    owners           = "B25003_002",  # Owner‑occupied
+    renters          = "B25003_003",  # Renter‑occupied
+
+    # --- age structure (from B01001) ---
+    pop_under18      = "B01001_003",  # one of the child age‑sex cells
+    # often easier to use total pop under 18 from table B09001_001:
+    child_total      = "B09001_001",  # Population under 18
+
+    # --- nativity / English proficiency (from C16001 / B05002) ---
+    lep_total        = "C16001_001",  # Total 5+ by English ability
+    lep_limited      = "C16001_004",  # Speaks English less than "very well"
+    nat_total        = "B05002_001",  # Total for nativity
+    nat_foreign      = "B05002_013"   # Foreign born
+  )
+
+ma_towns_raw <- get_acs(
+  geography = "county subdivision",
+  variables = vars,
+  state     = "MA",
+  year      = 2023,      # use 2023 data to match HS outcomes
+  survey    = "acs5",
+  output    = "wide"
+)
+
+ma_towns <- ma_towns_raw %>%
+  transmute(
+    GEOID,
+    town = str_remove(NAME, " city, Massachusetts| town, Massachusetts|, Massachusetts"),
+
+    # race/ethnicity proportions
+    pct_nh_white = nh_whiteE / tot_raceE,
+    pct_nh_black = nh_blackE / tot_raceE,
+    pct_nh_asian = nh_asianE / tot_raceE,
+    pct_hisp     = hisp_anyE / tot_raceE,
+
+    # SES
+    med_hh_inc_std   = (med_hh_incE - mean(med_hh_incE, na.rm=T)) / sd(med_hh_incE, na.rm=T),
+    pov_rate     = pov_belowE / tot_pov_univE,
+
+    # adult education (coarse example)
+    pct_lt_hs    = (edu25_lt_hsE + edu25_lt_hs2E) / edu25_totalE,
+    pct_bachplus = (edu25_bachE + edu25_advE) / edu25_totalE,
+
+    # tenure
+    pct_owner    = ownersE / occ_hh_totalE,
+    pct_renter   = rentersE / occ_hh_totalE,
+
+    # age and child share
+    pct_child    = child_totalE / total_popE,
+
+    # nativity / English proficiency
+    pct_foreign  = nat_foreignE / nat_totalE,
+    pct_lep      = lep_limitedE / lep_totalE
+  )
+```
+
+```{r save}
+# save as CSV 
+write_csv(ma_towns, file.path(dirname(getwd()), "Data", "acs_town_demographics.csv"))
+```

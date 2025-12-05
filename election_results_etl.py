@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 # define global for database URI
-DB_URI = ''
+DB_URI = 'postgresql://juliatucher:dataeng690@localhost:5432/juliatucher'
 
 def scrape_town_data(town):
     """
@@ -97,9 +97,11 @@ def transform_county_data(county_results, county):
     election_df['town'] = election_df['town'].str.title()
 
     # clean strings with directional names (N/S/E/W)
-    directions = {'N.':'North', 'S.':'South', 'E.':'East', 'W.':'West'}
-    for key, val in directions:
-        election_df['town'] = election_df['town'].apply(lambda col: col.replace(key, val))
+    election_df['town'] = (election_df['town']
+                        .str.replace(r'N\.', 'North', regex=True)
+                        .str.replace(r'S\.', 'South', regex=True)
+                        .str.replace(r'E\.', 'East', regex=True)
+                        .str.replace(r'W\.', 'West', regex=True))
     
     # clean numeric strings
     numeric_cols = ['response_yes', 'response_no', 'response_blank', 'response_total']

@@ -1,0 +1,59 @@
+---
+title: "Reshape District File"
+author: "Jules Tucher"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+root <- file.path(dirname(getwd()))
+datadir <- file.path(root, "Data")
+
+# load data files
+districts_attr <- read_csv(file.path(datadir, "SchoolDistrict_Secondary_AttrTable.csv"))
+election_results <- read_csv(file.path(datadir, "election_results.csv"))
+acs_demo <- read_csv(file.path(datadir, "acs_town_demographics.csv"))
+school_outcomes <- read_csv(file.path(datadir, "school_outcomes.csv"))
+```
+
+```{r town-school-lu}
+
+# reshape schools to town level
+town_school_lu <- districts_attr %>%
+  
+  # select relevant lookup fields
+  select(ORG8CODE, DISTRICT_N, MEMBERLIST) %>%
+  
+  # replace memberlist with district name if missing
+  mutate(MEMBERLIST = ifelse(is.na(MEMBERLIST), DISTRICT_N, MEMBERLIST)) %>%
+  
+  # split members into columns
+  separate(col = "MEMBERLIST", into = paste0("town_", rep(1:8)), sep = ", ", remove=T, fill="right") %>%
+  
+  # reshape to district-town level and filter NAs
+  pivot_longer(cols=town_1:town_8, names_to = "town_number", values_to = "town_name") %>%
+  filter(!is.na(town_name)) %>%
+  
+  # pivot to town level
+  group_by(town_name) %>%
+  mutate(index = row_number(ORG8CODE))
+
+# show that this isn't actually an issue if we just consider district schools
+table(town_school_lu$index)
+```
+
+```{r merge-files}
+
+school_outcomes_w_town <- town_school_lu %>%
+  select(ORG8CODE, DISTRICT_N, town_name) %>%
+  mutate(ORG8CODE = as.numeric(ORG8CODE)) %>%
+  # keep records from both, which is 331 with 6 towns missing outcomes
+  inner_join(school_outcomes, by = c("ORG8CODE"="district_code"), relationship = "many-to-one")
+
+# export school outcomes with town
+write_csv(school_outcomes_w_town, file.path(datadir, "school_outcomes_with_towns.csv"))
+  
+```

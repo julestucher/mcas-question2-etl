@@ -9,6 +9,18 @@ con <- dbConnect(RPostgres::Postgres(),
 # pull from sql query the combines school district data with town data and aggregates
 school_town_data <- dbGetQuery(con, read_file(file.path(local, "sql/get_school_analysis_data.sql")))
 
+# town data
+town_data <- dbGetQuery(con,
+                        'SELECT
+    county,
+    town,
+    SUM(response_yes) as response_yes,
+    SUM(response_no) as response_no,
+    SUM(response_blank) as response_blank,
+    SUM(response_total) as response_total
+  FROM election_result
+  GROUP BY county, town')
+
 # pull GIS data
 table_name <- "district_shapes"
 geom_column <- "geometry"
